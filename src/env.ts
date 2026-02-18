@@ -54,6 +54,8 @@ export function defineEnv(opts: CreateEnvOptions = {}): {
     );
   }
 
+  env.external = resolveArray(expandExternal(env.external, env.alias));
+
   return { env, presets };
 }
 
@@ -204,9 +206,51 @@ function mergePresets(...presets: Preset[]): ResolvedEnvironment {
   }
 
   env.polyfill = resolveArray(env.polyfill);
-  env.external = resolveArray(env.external);
 
   return env;
+}
+
+function expandExternal(rawExternal: string[], alias: Record<string, string>) {
+  const expanded: string[] = [];
+
+  const add = (id: string, negate: boolean) => {
+    if (!id) {
+      return;
+    }
+    expanded.push(negate ? `!${id}` : id);
+  };
+
+  for (const item of rawExternal) {
+    const negate = item.startsWith("!");
+    const id = negate ? item.slice(1) : item;
+    if (!id) {
+      continue;
+    }
+
+    const variants = new Set<string>();
+    variants.add(id);
+
+    // Normalize between node:<id> and bare <id> for Node builtins.
+    if (id.startsWith("node:")) {
+      variants.add(id.slice("node:".length));
+    } else if (builtinModules.includes(id)) {
+      variants.add(`node:${id}`);
+    }
+
+    // Include alias targets for either node: or bare forms.
+    for (const key of variants) {
+      const mapped = alias[key];
+      if (mapped && mapped !== key) {
+        variants.add(mapped);
+      }
+    }
+
+    for (const v of variants) {
+      add(v, negate);
+    }
+  }
+
+  return expanded;
 }
 
 /**
