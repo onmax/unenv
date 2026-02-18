@@ -53,6 +53,42 @@ describe("defineEnv", () => {
     expect(env.external).toEqual(["bar"]);
   });
 
+  it("expands externals to include bare/node: and alias-resolved ids", () => {
+    const { env } = defineEnv({
+      nodeCompat: false,
+      resolve: true,
+      presets: [
+        {
+          meta: { name: "test", url: import.meta.url },
+          external: ["node:async_hooks"],
+          alias: { "node:async_hooks": "unenv/node/async_hooks" },
+        },
+      ],
+    });
+
+    expect(env.external).toContain("node:async_hooks");
+    expect(env.external).toContain("async_hooks");
+    expect(env.external).toContain(env.alias["node:async_hooks"]);
+  });
+
+  it("expands negated externals too", () => {
+    const { env } = defineEnv({
+      nodeCompat: false,
+      resolve: true,
+      presets: [
+        {
+          meta: { name: "test", url: import.meta.url },
+          external: ["node:async_hooks", "!node:async_hooks"],
+          alias: { "node:async_hooks": "unenv/node/async_hooks" },
+        },
+      ],
+    });
+
+    expect(env.external).not.toContain("node:async_hooks");
+    expect(env.external).not.toContain("async_hooks");
+    expect(env.external).not.toContain(env.alias["node:async_hooks"]);
+  });
+
   describe("resolvePath", () => {
     it("resolves all nodeCompat paths", () => {
       const { env } = defineEnv({ nodeCompat: true, resolve: true });
